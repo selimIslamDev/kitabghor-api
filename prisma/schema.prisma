@@ -1,0 +1,186 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  CUSTOMER
+  ADMIN
+}
+
+enum ProductType {
+  BOOK
+  GADGET
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  UNPAID
+  PAID
+  REFUNDED
+}
+
+model User {
+  id        String     @id @default(cuid())
+  name      String
+  email     String     @unique
+  password  String
+  phone     String?
+  role      Role       @default(CUSTOMER)
+  addresses Address[]
+  orders    Order[]
+  reviews   Review[]
+  wishlist  Wishlist[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+model Address {
+  id         String  @id @default(cuid())
+  userId     String
+  user       User    @relation(fields: [userId], references: [id])
+  fullName   String
+  phone      String
+  address    String
+  city       String
+  district   String
+  postalCode String?
+  isDefault  Boolean @default(false)
+}
+
+model Category {
+  id       String      @id @default(cuid())
+  name     String
+  type     ProductType
+  parentId String?
+  parent   Category?   @relation("SubCategories", fields: [parentId], references: [id])
+  children Category[]  @relation("SubCategories")
+  products Product[]
+}
+
+model Product {
+  id            String      @id @default(cuid())
+  name          String
+  description   String
+  price         Float
+  discountPrice Float?
+  stock         Int         @default(0)
+  productType   ProductType
+  categoryId    String
+  category      Category    @relation(fields: [categoryId], references: [id])
+  images        String[]
+  specifications Json?
+
+  // Book only
+  author     String?
+  publisher  String?
+  edition    String?
+  classLevel String?
+  subject    String?
+  isbn       String?
+
+  // Gadget only
+  brand String?
+  model String?
+
+  reviews     Review[]
+  orderItems  OrderItem[]
+  wishlist    Wishlist[]
+  bundleItems BundleItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Bundle {
+  id              String       @id @default(cuid())
+  name            String
+  description     String?
+  discountPercent Float
+  items           BundleItem[]
+  createdAt       DateTime     @default(now())
+}
+
+model BundleItem {
+  id        String  @id @default(cuid())
+  bundleId  String
+  bundle    Bundle  @relation(fields: [bundleId], references: [id])
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+  quantity  Int     @default(1)
+}
+
+model Order {
+  id              String        @id @default(cuid())
+  userId          String
+  user            User          @relation(fields: [userId], references: [id])
+  items           OrderItem[]
+  totalAmount     Float
+  discountAmount  Float         @default(0)
+  finalAmount     Float
+  status          OrderStatus   @default(PENDING)
+  paymentMethod   String
+  paymentStatus   PaymentStatus @default(UNPAID)
+  trackingId      String?
+  shippingAddress Json
+  couponCode      String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+}
+
+model OrderItem {
+  id           String  @id @default(cuid())
+  orderId      String
+  order        Order   @relation(fields: [orderId], references: [id])
+  productId    String
+  product      Product @relation(fields: [productId], references: [id])
+  productName  String
+  productImage String
+  quantity     Int
+  price        Float
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  productId String
+  product   Product  @relation(fields: [productId], references: [id])
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now())
+}
+
+model Wishlist {
+  id        String  @id @default(cuid())
+  userId    String
+  user      User    @relation(fields: [userId], references: [id])
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+
+  @@unique([userId, productId])
+}
+
+model Coupon {
+  id             String    @id @default(cuid())
+  code           String    @unique
+  discountType   String
+  discountValue  Float
+  minOrderAmount Float?
+  maxUsage       Int?
+  usedCount      Int       @default(0)
+  expiresAt      DateTime?
+  isActive       Boolean   @default(true)
+}
