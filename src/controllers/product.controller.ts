@@ -1,6 +1,32 @@
 import { Request, Response } from "express";
 import { z } from "zod";
 import { prisma } from "../config/prisma";
+import { AuthRequest } from "../middleware/auth.middleware";
+
+// ── Validation Schemas ──────────────────────────────────
+const createProductSchema = z.object({
+  name: z.string().min(1, "নাম দিন"),
+  description: z.string().min(1, "বিবরণ দিন"),
+  price: z.number().positive("দাম সঠিক নয়"),
+  discountPrice: z.number().positive().optional(),
+  stock: z.number().int().min(0).default(0),
+  productType: z.enum(["BOOK", "GADGET"]),
+  categoryId: z.string().min(1, "Category দিন"),
+  images: z.array(z.string()).default([]),
+  specifications: z.record(z.unknown()).optional(),
+
+  // Book fields
+  author: z.string().optional(),
+  publisher: z.string().optional(),
+  edition: z.string().optional(),
+  classLevel: z.string().optional(),
+  subject: z.string().optional(),
+  isbn: z.string().optional(),
+
+  // Gadget fields
+  brand: z.string().optional(),
+  model: z.string().optional(),
+});
 
 const filterSchema = z.object({
   type: z.enum(["BOOK", "GADGET"]).optional(),
@@ -15,6 +41,8 @@ const filterSchema = z.object({
   limit: z.coerce.number().default(20),
 });
 
+// ── Public Controllers ──────────────────────────────────
+
 export const getProducts = async (req: Request, res: Response) => {
   try {
     const query = filterSchema.parse(req.query);
@@ -25,13 +53,23 @@ export const getProducts = async (req: Request, res: Response) => {
     if (categoryId) where.categoryId = categoryId;
     if (classLevel) where.classLevel = classLevel;
     if (subject) where.subject = subject;
-    if (minPrice || maxPrice) where.price = { ...(minPrice && { gte: minPrice }), ...(maxPrice && { lte: maxPrice }) };
-    if (search) where.name = { contains: search, mode: "insensitive" };
+    if (minPrice || maxPrice) {
+      where.price = {
+        ...(minPrice && { gte: minPrice }),
+        ...(maxPrice && { lte: maxPrice }),
+      };
+    }
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: "insensitive" } },
+        { author: { contains: search, mode: "insensitive" } },
+        { subject: { contains: search, mode: "insensitive" } },
+      ];
+    }
 
     const orderBy: Record<string, unknown> =
       sort === "price_asc" ? { price: "asc" } :
       sort === "price_desc" ? { price: "desc" } :
-      sort === "popular" ? { reviews: { _count: "desc" } } :
       { createdAt: "desc" };
 
     const [products, total] = await Promise.all([
@@ -40,7 +78,10 @@ export const getProducts = async (req: Request, res: Response) => {
         orderBy,
         skip: (page - 1) * limit,
         take: limit,
-        include: { category: true, _count: { select: { reviews: true } } },
+        include: {
+          category: true,
+          _count: { select: { reviews: true } },
+        },
       }),
       prisma.product.count({ where }),
     ]);
@@ -86,6 +127,7 @@ export const searchProducts = async (req: Request, res: Response) => {
           { name: { contains: String(q), mode: "insensitive" } },
           { author: { contains: String(q), mode: "insensitive" } },
           { subject: { contains: String(q), mode: "insensitive" } },
+          { publisher: { contains: String(q), mode: "insensitive" } },
         ],
       },
       take: 10,
@@ -122,6 +164,49 @@ export const getRelated = async (req: Request, res: Response) => {
       include: { category: true },
     });
     return res.json({ success: true, data: related });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+// ── Admin Controllers ───────────────────────────────────
+
+export const createProduct = async (req: AuthRequest, res: Response) => {
+  try {
+    const body = createProductSchema.safeParse(req.body);
+    if (!body.success) return res.status(400).json({ success: false, message: body.error.errors[0].message });
+
+    // Category আছে কিনা চেক
+    const category = await prisma.category.findUnique({ where: { id: body.data.categoryId } });
+    if (!category) return res.status(404).json({ success: false, message: "Category পাওয়া যায়নি" });
+
+    const product = await prisma.product.create({ data: body.data, include: { category: true } });
+    return res.status(201).json({ success: true, message: "প্রোডাক্ট তৈরি হয়েছে", data: product });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+export const updateProduct = async (req: AuthRequest, res: Response) => {
+  try {
+    const body = createProductSchema.partial().safeParse(req.body);
+    if (!body.success) return res.status(400).json({ success: false, message: body.error.errors[0].message });
+
+    const product = await prisma.product.update({
+      where: { id: req.params.id },
+      data: body.data,
+      include: { category: true },
+    });
+    return res.json({ success: true, message: "প্রোডাক্ট আপডেট হয়েছে", data: product });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+export const deleteProduct = async (req: AuthRequest, res: Response) => {
+  try {
+    await prisma.product.delete({ where: { id: req.params.id } });
+    return res.json({ success: true, message: "প্রোডাক্ট ডিলিট হয়েছে" });
   } catch (error) {
     return res.status(500).json({ success: false, message: "Server error" });
   }
