@@ -32,12 +32,13 @@ app.use("/api/v1/categories", categoryRoutes);
 app.use("/api/v1/bundles", bundleRoutes);
 app.use("/api/v1/cart", cartRoutes);
 app.use("/api/v1/orders", orderRoutes);
-app.use("/api/v1/reviews", reviewRoutes);
+app.use("/api/v1", reviewRoutes);
 app.use("/api/v1/coupons", couponRoutes);
 app.use("/api/v1/payments", paymentRoutes);
 app.use("/api/v1/admin", adminRoutes);
 
-// ── Health Check ────────────────────────────────────────
+// ── Health Check ────────────────────────────────────────  
+
 app.get("/health", (_req, res) => {
   res.json({ status: "ok", message: "KitabGhor API চালু আছে 🚀" });
 });
