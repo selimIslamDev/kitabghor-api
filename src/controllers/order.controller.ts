@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { z } from "zod";
 import { prisma } from "../config/prisma";
 import { AuthRequest } from "../middleware/auth.middleware";
+import { getIO } from "../config/socket";
 
 const createOrderSchema = z.object({
   items: z.array(z.object({ productId: z.string(), quantity: z.number().min(1) })).min(1),
@@ -31,7 +32,7 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
 
     for (let i = 0; i < products.length; i++) {
       const product = products[i];
-      if (!product) return res.status(404).json({ success: false, message: `প্রোডাক্ট পাওয়া যায়নি` });
+      if (!product) return res.status(404).json({ success: false, message: "প্রোডাক্ট পাওয়া যায়নি" });
       if (product.stock < items[i].quantity) {
         return res.status(400).json({ success: false, message: `${product.name} এর stock কম` });
       }
@@ -68,6 +69,12 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
 
     const finalAmount = totalAmount - discountAmount;
 
+    // Get user info
+    const user = await prisma.user.findUnique({
+      where: { id: req.userId },
+      select: { name: true, email: true, phone: true },
+    });
+
     // Create order
     const order = await prisma.order.create({
       data: {
@@ -89,6 +96,22 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
         prisma.product.update({ where: { id: item.productId }, data: { stock: { decrement: item.quantity } } })
       )
     );
+
+    // 🔔 Socket.io — Admin কে notification পাঠাও
+    try {
+      const io = getIO();
+      io.to("admin-room").emit("new-order", {
+        id: order.id,
+        customerName: user?.name || "Unknown",
+        customerPhone: user?.phone || "",
+        totalAmount: order.finalAmount,
+        itemCount: order.items.length,
+        paymentMethod: order.paymentMethod,
+        createdAt: order.createdAt,
+      });
+    } catch (e) {
+      // Socket error ignore করো — order তৈরি হয়ে গেছে
+    }
 
     return res.status(201).json({ success: true, message: "অর্ডার তৈরি হয়েছে", data: order });
   } catch (error) {
