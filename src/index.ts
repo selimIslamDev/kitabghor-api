@@ -30,6 +30,7 @@ import reviewRoutes from "./routes/review.routes";
 import couponRoutes from "./routes/coupon.routes";
 import paymentRoutes from "./routes/payment.routes";
 import adminRoutes from "./routes/admin.routes";
+import uploadRoutes from "./routes/upload.routes";
 
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/users", userRoutes);
@@ -42,6 +43,8 @@ app.use("/api/v1", reviewRoutes);
 app.use("/api/v1/coupons", couponRoutes);
 app.use("/api/v1/payments", paymentRoutes);
 app.use("/api/v1/admin", adminRoutes);
+
+app.use("/api/v1/upload", uploadRoutes);
 
 // Health Check
 app.get("/health", (_req, res) => {
