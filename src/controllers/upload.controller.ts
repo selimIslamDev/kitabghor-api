@@ -8,15 +8,18 @@ export const uploadImage = async (req: Request, res: Response) => {
     }
 
     const file = req.file as any;
+
+    // Cloudinary থেকে full secure URL নাও
+    const url = file.path || file.secure_url;
+    const publicId = file.filename || file.public_id;
+
     return res.json({
       success: true,
       message: "Image uploaded successfully!",
-      data: {
-        url: file.path,
-        publicId: file.filename,
-      },
+      data: { url, publicId },
     });
   } catch (error) {
+    console.error("Upload error:", error);
     return res.status(500).json({ success: false, message: "Upload failed!" });
   }
 };
@@ -27,7 +30,6 @@ export const deleteImage = async (req: Request, res: Response) => {
     if (!publicId) {
       return res.status(400).json({ success: false, message: "Public ID required!" });
     }
-
     await cloudinary.uploader.destroy(publicId);
     return res.json({ success: true, message: "Image deleted!" });
   } catch (error) {
