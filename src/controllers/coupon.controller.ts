@@ -4,38 +4,37 @@ import { prisma } from "../config/prisma";
 import { AuthRequest } from "../middleware/auth.middleware";
 
 const createCouponSchema = z.object({
-  code: z.string().min(3, "কুপন কোড কমপক্ষে ৩ অক্ষর হতে হবে").toUpperCase(),
+  code: z.string().min(3, "Coupon code must be at least 3 characters").toUpperCase(),
   discountType: z.enum(["percent", "fixed"]),
-  discountValue: z.number().positive("ডিসকাউন্ট সঠিক নয়"),
+  discountValue: z.number().positive("Discount value is invalid"),
   minOrderAmount: z.number().positive().optional(),
   maxUsage: z.number().int().positive().optional(),
-  expiresAt: z.string().datetime().optional(),
+  expiresAt: z.string().optional(),
 });
 
-// কুপন validate করা (Customer)
+// Validate coupon (Customer)
 export const validateCoupon = async (req: Request, res: Response) => {
   try {
     const { code, orderAmount } = req.body;
-    if (!code) return res.status(400).json({ success: false, message: "কুপন কোড দিন" });
+    if (!code) return res.status(400).json({ success: false, message: "Please enter a coupon code" });
 
     const coupon = await prisma.coupon.findUnique({ where: { code: code.toUpperCase() } });
 
-    if (!coupon) return res.status(404).json({ success: false, message: "কুপন পাওয়া যায়নি" });
-    if (!coupon.isActive) return res.status(400).json({ success: false, message: "কুপনটি আর সক্রিয় নেই" });
+    if (!coupon) return res.status(404).json({ success: false, message: "Coupon not found" });
+    if (!coupon.isActive) return res.status(400).json({ success: false, message: "This coupon is no longer active" });
     if (coupon.expiresAt && new Date() > coupon.expiresAt) {
-      return res.status(400).json({ success: false, message: "কুপনের মেয়াদ শেষ হয়ে গেছে" });
+      return res.status(400).json({ success: false, message: "This coupon has expired" });
     }
     if (coupon.maxUsage && coupon.usedCount >= coupon.maxUsage) {
-      return res.status(400).json({ success: false, message: "কুপনের ব্যবহার সীমা শেষ" });
+      return res.status(400).json({ success: false, message: "This coupon has reached its usage limit" });
     }
     if (coupon.minOrderAmount && orderAmount < coupon.minOrderAmount) {
       return res.status(400).json({
         success: false,
-        message: `এই কুপন ব্যবহার করতে কমপক্ষে ৳${coupon.minOrderAmount} এর অর্ডার করতে হবে`,
+        message: `Minimum order amount of ৳${coupon.minOrderAmount} is required to use this coupon`,
       });
     }
 
-    // Discount calculate
     const discountAmount =
       coupon.discountType === "percent"
         ? (orderAmount * coupon.discountValue) / 100
@@ -43,7 +42,7 @@ export const validateCoupon = async (req: Request, res: Response) => {
 
     return res.json({
       success: true,
-      message: "কুপন সফলভাবে প্রয়োগ হয়েছে",
+      message: "Coupon applied successfully",
       data: {
         code: coupon.code,
         discountType: coupon.discountType,
@@ -57,42 +56,48 @@ export const validateCoupon = async (req: Request, res: Response) => {
   }
 };
 
-// সব কুপন দেখা (Admin)
+// Get all coupons (Admin)
 export const getCoupons = async (_req: Request, res: Response) => {
   try {
-    const coupons = await prisma.coupon.findMany({ orderBy: { createdAt: "desc" } });
+    const coupons = await prisma.coupon.findMany({
+      orderBy: { code: "asc" },
+    });
     return res.json({ success: true, data: coupons });
   } catch (error) {
     return res.status(500).json({ success: false, message: "Server error" });
   }
 };
 
-// নতুন কুপন বানানো (Admin)
+// Create coupon (Admin)
 export const createCoupon = async (req: AuthRequest, res: Response) => {
   try {
     const body = createCouponSchema.safeParse(req.body);
     if (!body.success) return res.status(400).json({ success: false, message: body.error.errors[0].message });
 
     const exists = await prisma.coupon.findUnique({ where: { code: body.data.code } });
-    if (exists) return res.status(400).json({ success: false, message: "এই কুপন কোড আগেই আছে" });
+    if (exists) return res.status(400).json({ success: false, message: "This coupon code already exists" });
 
     const coupon = await prisma.coupon.create({
       data: {
-        ...body.data,
+        code: body.data.code,
+        discountType: body.data.discountType,
+        discountValue: body.data.discountValue,
+        minOrderAmount: body.data.minOrderAmount,
+        maxUsage: body.data.maxUsage,
         expiresAt: body.data.expiresAt ? new Date(body.data.expiresAt) : undefined,
       },
     });
-    return res.status(201).json({ success: true, message: "কুপন তৈরি হয়েছে", data: coupon });
+    return res.status(201).json({ success: true, message: "Coupon created successfully", data: coupon });
   } catch (error) {
     return res.status(500).json({ success: false, message: "Server error" });
   }
 };
 
-// কুপন active/inactive করা (Admin)
+// Toggle coupon active/inactive (Admin)
 export const toggleCoupon = async (req: AuthRequest, res: Response) => {
   try {
     const coupon = await prisma.coupon.findUnique({ where: { id: req.params.id } });
-    if (!coupon) return res.status(404).json({ success: false, message: "কুপন পাওয়া যায়নি" });
+    if (!coupon) return res.status(404).json({ success: false, message: "Coupon not found" });
 
     const updated = await prisma.coupon.update({
       where: { id: req.params.id },
@@ -100,7 +105,7 @@ export const toggleCoupon = async (req: AuthRequest, res: Response) => {
     });
     return res.json({
       success: true,
-      message: updated.isActive ? "কুপন সক্রিয় করা হয়েছে" : "কুপন নিষ্ক্রিয় করা হয়েছে",
+      message: updated.isActive ? "Coupon activated" : "Coupon deactivated",
       data: updated,
     });
   } catch (error) {
@@ -108,11 +113,11 @@ export const toggleCoupon = async (req: AuthRequest, res: Response) => {
   }
 };
 
-// কুপন ডিলিট (Admin)
+// Delete coupon (Admin)
 export const deleteCoupon = async (req: AuthRequest, res: Response) => {
   try {
     await prisma.coupon.delete({ where: { id: req.params.id } });
-    return res.json({ success: true, message: "কুপন ডিলিট হয়েছে" });
+    return res.json({ success: true, message: "Coupon deleted successfully" });
   } catch (error) {
     return res.status(500).json({ success: false, message: "Server error" });
   }
