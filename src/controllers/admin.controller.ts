@@ -3,9 +3,7 @@ import { z } from "zod";
 import { prisma } from "../config/prisma";
 import { AuthRequest } from "../middleware/auth.middleware";
 
-// ── Dashboard ────────────────────────────────────────────
-
-export const getDashboard = async (_req: Request, res: Response) => {
+export const getDashboard = async (_req: Request, res: Response): Promise<any> => {
   try {
     const [
       totalUsers,
@@ -59,13 +57,8 @@ export const getDashboard = async (_req: Request, res: Response) => {
   }
 };
 
-// ── Analytics ────────────────────────────────────────────
-
-export const getAnalytics = async (req: Request, res: Response) => {
+export const getAnalytics = async (_req: Request, res: Response): Promise<any> => {
   try {
-    const { period = "monthly" } = req.query;
-
-    // Last 6 months এর sales data
     const sixMonthsAgo = new Date();
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
@@ -78,14 +71,12 @@ export const getAnalytics = async (req: Request, res: Response) => {
       orderBy: { createdAt: "asc" },
     });
 
-    // Month অনুযায়ী group করা
     const monthlyData: Record<string, number> = {};
     orders.forEach((order) => {
-      const month = order.createdAt.toISOString().slice(0, 7); // "2024-01"
+      const month = order.createdAt.toISOString().slice(0, 7);
       monthlyData[month] = (monthlyData[month] || 0) + order.finalAmount;
     });
 
-    // Top selling products
     const topProducts = await prisma.orderItem.groupBy({
       by: ["productId", "productName"],
       _sum: { quantity: true },
@@ -93,7 +84,6 @@ export const getAnalytics = async (req: Request, res: Response) => {
       take: 5,
     });
 
-    // Category wise sales
     const categoryStats = await prisma.category.findMany({
       include: {
         _count: { select: { products: true } },
@@ -113,13 +103,11 @@ export const getAnalytics = async (req: Request, res: Response) => {
   }
 };
 
-// ── Orders Management ────────────────────────────────────
-
-export const getAllOrders = async (req: Request, res: Response) => {
+export const getAllOrders = async (req: Request, res: Response): Promise<any> => {
   try {
     const { status, page = 1, limit = 20 } = req.query;
 
-    const where: Record<string, unknown> = {};
+    const where: any = {};
     if (status) where.status = status;
 
     const [orders, total] = await Promise.all([
@@ -146,7 +134,7 @@ export const getAllOrders = async (req: Request, res: Response) => {
   }
 };
 
-export const updateOrderStatus = async (req: AuthRequest, res: Response) => {
+export const updateOrderStatus = async (req: AuthRequest, res: Response): Promise<any> => {
   try {
     const schema = z.object({
       status: z.enum(["PENDING", "CONFIRMED", "PROCESSING", "SHIPPED", "DELIVERED", "CANCELLED"]),
@@ -164,22 +152,22 @@ export const updateOrderStatus = async (req: AuthRequest, res: Response) => {
       },
     });
 
-    return res.json({ success: true, message: "অর্ডার স্ট্যাটাস আপডেট হয়েছে", data: order });
+    return res.json({ success: true, message: "Order status updated successfully", data: order });
   } catch (error) {
     return res.status(500).json({ success: false, message: "Server error" });
   }
 };
 
-// ── Users Management ─────────────────────────────────────
-
-export const getAllUsers = async (req: Request, res: Response) => {
+export const getAllUsers = async (req: Request, res: Response): Promise<any> => {
   try {
     const { page = 1, limit = 20 } = req.query;
 
     const [users, total] = await Promise.all([
       prisma.user.findMany({
         where: { role: "CUSTOMER" },
-        select: { id: true, name: true, email: true, phone: true, role: true, createdAt: true,
+        select: {
+          id: true, name: true, email: true, phone: true,
+          role: true, createdAt: true,
           _count: { select: { orders: true } },
         },
         orderBy: { createdAt: "desc" },
@@ -199,17 +187,12 @@ export const getAllUsers = async (req: Request, res: Response) => {
   }
 };
 
-// ── Inventory ────────────────────────────────────────────
-
-export const getInventory = async (_req: Request, res: Response) => {
+export const getInventory = async (_req: Request, res: Response): Promise<any> => {
   try {
     const products = await prisma.product.findMany({
       select: {
-        id: true,
-        name: true,
-        stock: true,
-        productType: true,
-        price: true,
+        id: true, name: true, stock: true,
+        productType: true, price: true,
         category: { select: { name: true } },
       },
       orderBy: { stock: "asc" },
@@ -231,11 +214,11 @@ export const getInventory = async (_req: Request, res: Response) => {
   }
 };
 
-export const updateStock = async (req: AuthRequest, res: Response) => {
+export const updateStock = async (req: AuthRequest, res: Response): Promise<any> => {
   try {
     const { stock } = req.body;
     if (stock === undefined || stock < 0) {
-      return res.status(400).json({ success: false, message: "সঠিক stock পরিমাণ দিন" });
+      return res.status(400).json({ success: false, message: "Please enter a valid stock amount" });
     }
 
     const product = await prisma.product.update({
@@ -244,7 +227,7 @@ export const updateStock = async (req: AuthRequest, res: Response) => {
       select: { id: true, name: true, stock: true },
     });
 
-    return res.json({ success: true, message: "Stock আপডেট হয়েছে", data: product });
+    return res.json({ success: true, message: "Stock updated successfully", data: product });
   } catch (error) {
     return res.status(500).json({ success: false, message: "Server error" });
   }

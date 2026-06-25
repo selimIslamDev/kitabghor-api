@@ -18,27 +18,25 @@ const createOrderSchema = z.object({
   couponCode: z.string().optional(),
 });
 
-export const createOrder = async (req: AuthRequest, res: Response) => {
+export const createOrder = async (req: AuthRequest, res: Response): Promise<any> => {
   try {
     const body = createOrderSchema.safeParse(req.body);
     if (!body.success) return res.status(400).json({ success: false, message: body.error.errors[0].message });
 
     const { items, shippingAddress, paymentMethod, couponCode } = body.data;
 
-    // Fetch products and check stock
     const products = await Promise.all(
       items.map((item) => prisma.product.findUnique({ where: { id: item.productId } }))
     );
 
     for (let i = 0; i < products.length; i++) {
       const product = products[i];
-      if (!product) return res.status(404).json({ success: false, message: "প্রোডাক্ট পাওয়া যায়নি" });
+      if (!product) return res.status(404).json({ success: false, message: "Product not found" });
       if (product.stock < items[i].quantity) {
-        return res.status(400).json({ success: false, message: `${product.name} এর stock কম` });
+        return res.status(400).json({ success: false, message: `${product.name} is out of stock` });
       }
     }
 
-    // Calculate total
     let totalAmount = 0;
     const orderItems = items.map((item, i) => {
       const product = products[i]!;
@@ -53,7 +51,6 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
       };
     });
 
-    // Apply coupon
     let discountAmount = 0;
     if (couponCode) {
       const coupon = await prisma.coupon.findUnique({ where: { code: couponCode, isActive: true } });
@@ -69,13 +66,11 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
 
     const finalAmount = totalAmount - discountAmount;
 
-    // Get user info
     const user = await prisma.user.findUnique({
       where: { id: req.userId },
       select: { name: true, email: true, phone: true },
     });
 
-    // Create order
     const order = await prisma.order.create({
       data: {
         userId: req.userId!,
@@ -90,14 +85,12 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
       include: { items: true },
     });
 
-    // Deduct stock
     await Promise.all(
       items.map((item) =>
         prisma.product.update({ where: { id: item.productId }, data: { stock: { decrement: item.quantity } } })
       )
     );
 
-    // 🔔 Socket.io — Admin কে notification পাঠাও
     try {
       const io = getIO();
       io.to("admin-room").emit("new-order", {
@@ -109,30 +102,28 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
         paymentMethod: order.paymentMethod,
         createdAt: order.createdAt,
       });
-    } catch (e) {
-      // Socket error ignore করো — order তৈরি হয়ে গেছে
-    }
+    } catch (e) {}
 
-    return res.status(201).json({ success: true, message: "অর্ডার তৈরি হয়েছে", data: order });
+    return res.status(201).json({ success: true, message: "Order placed successfully", data: order });
   } catch (error) {
     return res.status(500).json({ success: false, message: "Server error" });
   }
 };
 
-export const getOrder = async (req: AuthRequest, res: Response) => {
+export const getOrder = async (req: AuthRequest, res: Response): Promise<any> => {
   try {
     const order = await prisma.order.findFirst({
       where: { id: req.params.id, userId: req.userId },
       include: { items: true },
     });
-    if (!order) return res.status(404).json({ success: false, message: "অর্ডার পাওয়া যায়নি" });
+    if (!order) return res.status(404).json({ success: false, message: "Order not found" });
     return res.json({ success: true, data: order });
   } catch (error) {
     return res.status(500).json({ success: false, message: "Server error" });
   }
 };
 
-export const getMyOrders = async (req: AuthRequest, res: Response) => {
+export const getMyOrders = async (req: AuthRequest, res: Response): Promise<any> => {
   try {
     const orders = await prisma.order.findMany({
       where: { userId: req.userId },

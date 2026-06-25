@@ -4,11 +4,10 @@ import jwt from "jsonwebtoken";
 import { z } from "zod";
 import { prisma } from "../config/prisma";
 
-// ── Validation Schemas ──────────────────────────────────
 const registerSchema = z.object({
-  name: z.string().min(2, "নাম কমপক্ষে ২ অক্ষর হতে হবে"),
-  email: z.string().email("সঠিক email দিন"),
-  password: z.string().min(6, "পাসওয়ার্ড কমপক্ষে ৬ অক্ষর হতে হবে"),
+  name: z.string().min(2, "Name must be at least 2 characters"),
+  email: z.string().email("Please enter a valid email"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
   phone: z.string().optional(),
 });
 
@@ -17,8 +16,7 @@ const loginSchema = z.object({
   password: z.string().min(1),
 });
 
-// ── Controllers ─────────────────────────────────────────
-export const register = async (req: Request, res: Response) => {
+export const register = async (req: Request, res: Response): Promise<any> => {
   try {
     const body = registerSchema.safeParse(req.body);
     if (!body.success) return res.status(400).json({ success: false, message: body.error.errors[0].message });
@@ -26,7 +24,7 @@ export const register = async (req: Request, res: Response) => {
     const { name, email, password, phone } = body.data;
 
     const exists = await prisma.user.findUnique({ where: { email } });
-    if (exists) return res.status(400).json({ success: false, message: "এই email দিয়ে আগেই অ্যাকাউন্ট আছে" });
+    if (exists) return res.status(400).json({ success: false, message: "An account with this email already exists" });
 
     const hashedPassword = await bcrypt.hash(password, 12);
     const user = await prisma.user.create({
@@ -36,12 +34,12 @@ export const register = async (req: Request, res: Response) => {
     const token = jwt.sign(
       { id: user.id, role: user.role },
       process.env.JWT_SECRET!,
-      { expiresIn: process.env.JWT_EXPIRES_IN || "7d" }
+      { expiresIn: "7d" }
     );
 
     return res.status(201).json({
       success: true,
-      message: "রেজিস্ট্রেশন সফল হয়েছে",
+      message: "Registration successful",
       data: {
         user: { id: user.id, name: user.name, email: user.email, phone: user.phone, role: user.role },
         token,
@@ -52,28 +50,28 @@ export const register = async (req: Request, res: Response) => {
   }
 };
 
-export const login = async (req: Request, res: Response) => {
+export const login = async (req: Request, res: Response): Promise<any> => {
   try {
     const body = loginSchema.safeParse(req.body);
-    if (!body.success) return res.status(400).json({ success: false, message: "Email বা পাসওয়ার্ড সঠিক নয়" });
+    if (!body.success) return res.status(400).json({ success: false, message: "Invalid email or password" });
 
     const { email, password } = body.data;
 
     const user = await prisma.user.findUnique({ where: { email } });
-    if (!user) return res.status(401).json({ success: false, message: "Email বা পাসওয়ার্ড ভুল" });
+    if (!user) return res.status(401).json({ success: false, message: "Invalid email or password" });
 
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(401).json({ success: false, message: "Email বা পাসওয়ার্ড ভুল" });
+    if (!isMatch) return res.status(401).json({ success: false, message: "Invalid email or password" });
 
     const token = jwt.sign(
       { id: user.id, role: user.role },
       process.env.JWT_SECRET!,
-      { expiresIn: process.env.JWT_EXPIRES_IN || "7d" }
+      { expiresIn: "7d" }
     );
 
     return res.json({
       success: true,
-      message: "লগইন সফল",
+      message: "Login successful",
       data: {
         user: { id: user.id, name: user.name, email: user.email, phone: user.phone, role: user.role },
         token,
@@ -84,13 +82,13 @@ export const login = async (req: Request, res: Response) => {
   }
 };
 
-export const getMe = async (req: Request & { userId?: string }, res: Response) => {
+export const getMe = async (req: Request & { userId?: string }, res: Response): Promise<any> => {
   try {
     const user = await prisma.user.findUnique({
       where: { id: req.userId },
       select: { id: true, name: true, email: true, phone: true, role: true, createdAt: true },
     });
-    if (!user) return res.status(404).json({ success: false, message: "User পাওয়া যায়নি" });
+    if (!user) return res.status(404).json({ success: false, message: "User not found" });
     return res.json({ success: true, data: user });
   } catch (error) {
     return res.status(500).json({ success: false, message: "Server error" });

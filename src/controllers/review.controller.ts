@@ -4,12 +4,11 @@ import { prisma } from "../config/prisma";
 import { AuthRequest } from "../middleware/auth.middleware";
 
 const reviewSchema = z.object({
-  rating: z.number().int().min(1).max(5, "রেটিং ১-৫ এর মধ্যে হতে হবে"),
+  rating: z.number().int().min(1).max(5, "Rating must be between 1 and 5"),
   comment: z.string().optional(),
 });
 
-// একটি product এর সব review
-export const getProductReviews = async (req: Request, res: Response) => {
+export const getProductReviews = async (req: Request, res: Response): Promise<any> => {
   try {
     const reviews = await prisma.review.findMany({
       where: { productId: req.params.id },
@@ -17,7 +16,6 @@ export const getProductReviews = async (req: Request, res: Response) => {
       orderBy: { createdAt: "desc" },
     });
 
-    // Average rating calculate
     const avgRating = reviews.length
       ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length
       : 0;
@@ -35,21 +33,18 @@ export const getProductReviews = async (req: Request, res: Response) => {
   }
 };
 
-// Review দেওয়া
-export const createReview = async (req: AuthRequest, res: Response) => {
+export const createReview = async (req: AuthRequest, res: Response): Promise<any> => {
   try {
     const body = reviewSchema.safeParse(req.body);
     if (!body.success) return res.status(400).json({ success: false, message: body.error.errors[0].message });
 
-    // Product আছে কিনা চেক
     const product = await prisma.product.findUnique({ where: { id: req.params.id } });
-    if (!product) return res.status(404).json({ success: false, message: "প্রোডাক্ট পাওয়া যায়নি" });
+    if (!product) return res.status(404).json({ success: false, message: "Product not found" });
 
-    // আগে review দিয়েছে কিনা চেক
     const existing = await prisma.review.findFirst({
       where: { productId: req.params.id, userId: req.userId },
     });
-    if (existing) return res.status(400).json({ success: false, message: "আপনি আগেই এই প্রোডাক্টে review দিয়েছেন" });
+    if (existing) return res.status(400).json({ success: false, message: "You have already reviewed this product" });
 
     const review = await prisma.review.create({
       data: {
@@ -61,25 +56,23 @@ export const createReview = async (req: AuthRequest, res: Response) => {
       include: { user: { select: { id: true, name: true } } },
     });
 
-    return res.status(201).json({ success: true, message: "Review দেওয়া হয়েছে", data: review });
+    return res.status(201).json({ success: true, message: "Review submitted successfully", data: review });
   } catch (error) {
     return res.status(500).json({ success: false, message: "Server error" });
   }
 };
 
-// Review ডিলিট
-export const deleteReview = async (req: AuthRequest, res: Response) => {
+export const deleteReview = async (req: AuthRequest, res: Response): Promise<any> => {
   try {
     const review = await prisma.review.findUnique({ where: { id: req.params.id } });
-    if (!review) return res.status(404).json({ success: false, message: "Review পাওয়া যায়নি" });
+    if (!review) return res.status(404).json({ success: false, message: "Review not found" });
 
-    // নিজের review বা admin ডিলিট করতে পারবে
     if (review.userId !== req.userId && req.userRole !== "ADMIN") {
-      return res.status(403).json({ success: false, message: "এই review ডিলিট করার অনুমতি নেই" });
+      return res.status(403).json({ success: false, message: "You do not have permission to delete this review" });
     }
 
     await prisma.review.delete({ where: { id: req.params.id } });
-    return res.json({ success: true, message: "Review ডিলিট হয়েছে" });
+    return res.json({ success: true, message: "Review deleted successfully" });
   } catch (error) {
     return res.status(500).json({ success: false, message: "Server error" });
   }
