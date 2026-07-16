@@ -11,11 +11,6 @@ const is_live = process.env.SSLCOMMERZ_IS_LIVE === "true";
 const BACKEND_URL = process.env.BACKEND_URL as string;
 const FRONTEND_URL = process.env.FRONTEND_URL as string;
 
-/**
- * STEP 1: Payment initiate
- * Frontend calls this after order create hoye jawar por (order already PENDING/UNPAID)
- * Ei route SSLCommerz session banai GatewayPageURL return kore, frontend oikhane redirect kore dey
- */
 export const initiateSSLCommerzPayment = async (req: AuthRequest, res: Response): Promise<any> => {
   try {
     const { orderId } = req.params;
@@ -33,19 +28,17 @@ export const initiateSSLCommerzPayment = async (req: AuthRequest, res: Response)
       return res.status(400).json({ success: false, message: "This order is already paid" });
     }
 
-    // Unique tran_id — order id + timestamp, jate retry korle o unique thake
     const tran_id = `${order.id}-${Date.now()}`;
-
     const shippingAddress = order.shippingAddress as any;
 
     const data = {
       total_amount: order.finalAmount,
       currency: "BDT",
       tran_id,
-      success_url: `${BACKEND_URL}/api/payments/sslcommerz/success`,
-      fail_url: `${BACKEND_URL}/api/payments/sslcommerz/fail`,
-      cancel_url: `${BACKEND_URL}/api/payments/sslcommerz/cancel`,
-      ipn_url: `${BACKEND_URL}/api/payments/sslcommerz/ipn`,
+      success_url: `${BACKEND_URL}/api/v1/payments/sslcommerz/success`,
+      fail_url: `${BACKEND_URL}/api/v1/payments/sslcommerz/fail`,
+      cancel_url: `${BACKEND_URL}/api/v1/payments/sslcommerz/cancel`,
+      ipn_url: `${BACKEND_URL}/api/v1/payments/sslcommerz/ipn`,
       shipping_method: "Courier",
       product_name: "KitabGhor Order",
       product_category: "Books & Gadgets",
@@ -66,7 +59,6 @@ export const initiateSSLCommerzPayment = async (req: AuthRequest, res: Response)
       ship_country: "Bangladesh",
     };
 
-    // Save tran_id against order BEFORE redirecting, so success/ipn callback can match it back
     await prisma.order.update({
       where: { id: order.id },
       data: { trackingId: tran_id },
@@ -90,10 +82,6 @@ export const initiateSSLCommerzPayment = async (req: AuthRequest, res: Response)
   }
 };
 
-/**
- * STEP 2: Success callback — SSLCommerz POST kore (form-urlencoded) eikhane redirect korar por
- * val_id diye Validation API call kore confirm kori je payment genuinely successful
- */
 export const sslcommerzSuccess = async (req: Request, res: Response): Promise<any> => {
   try {
     const { val_id, tran_id } = req.body;
@@ -115,7 +103,6 @@ export const sslcommerzSuccess = async (req: Request, res: Response): Promise<an
       return res.redirect(`${FRONTEND_URL}/payment/fail?reason=order_not_found`);
     }
 
-    // Already paid hoye gele (IPN age process kore fele thakle) duplicate update na kori
     if (order.paymentStatus !== "PAID") {
       await prisma.order.update({
         where: { id: order.id },
@@ -135,9 +122,6 @@ export const sslcommerzSuccess = async (req: Request, res: Response): Promise<an
   }
 };
 
-/**
- * STEP 3: Fail callback
- */
 export const sslcommerzFail = async (req: Request, res: Response): Promise<any> => {
   const { tran_id } = req.body;
   if (tran_id) {
@@ -149,9 +133,6 @@ export const sslcommerzFail = async (req: Request, res: Response): Promise<any> 
   return res.redirect(`${FRONTEND_URL}/payment/fail`);
 };
 
-/**
- * STEP 4: Cancel callback
- */
 export const sslcommerzCancel = async (req: Request, res: Response): Promise<any> => {
   const { tran_id } = req.body;
   if (tran_id) {
@@ -163,11 +144,6 @@ export const sslcommerzCancel = async (req: Request, res: Response): Promise<any
   return res.redirect(`${FRONTEND_URL}/payment/cancel`);
 };
 
-/**
- * STEP 5: IPN (Instant Payment Notification) — server-to-server backup
- * User browser redirect na hoile o SSLCommerz eikhane background e notify kore,
- * tai success_url miss hoye gele o eta safety net hishebe kaj kore
- */
 export const sslcommerzIPN = async (req: Request, res: Response): Promise<any> => {
   try {
     const { val_id, tran_id, status } = req.body;
