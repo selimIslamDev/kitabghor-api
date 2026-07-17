@@ -3,6 +3,7 @@ import SSLCommerzPayment from "sslcommerz-lts";
 import { prisma } from "../config/prisma";
 import { AuthRequest } from "../middleware/auth.middleware";
 import { getIO } from "../config/socket";
+import { sendOrderConfirmationEmail } from "../services/email.service";
 
 const store_id = process.env.SSLCOMMERZ_STORE_ID as string;
 const store_passwd = process.env.SSLCOMMERZ_STORE_PASSWORD as string;
@@ -104,15 +105,29 @@ export const sslcommerzSuccess = async (req: Request, res: Response): Promise<an
     }
 
     if (order.paymentStatus !== "PAID") {
-      await prisma.order.update({
+      const updatedOrder = await prisma.order.update({
         where: { id: order.id },
         data: { paymentStatus: "PAID", status: "CONFIRMED" },
+        include: { items: true, user: true },
       });
 
       try {
         const io = getIO();
         io.to("admin-room").emit("order-paid", { id: order.id, finalAmount: order.finalAmount });
       } catch (e) {}
+
+      sendOrderConfirmationEmail({
+        toEmail: updatedOrder.user.email,
+        customerName: updatedOrder.user.name,
+        orderId: updatedOrder.id,
+        items: updatedOrder.items.map((item) => ({
+          productName: item.productName,
+          quantity: item.quantity,
+          price: item.price,
+        })),
+        finalAmount: updatedOrder.finalAmount,
+        shippingAddress: updatedOrder.shippingAddress as any,
+      });
     }
 
     return res.redirect(`${FRONTEND_URL}/payment/success?orderId=${order.id}`);
