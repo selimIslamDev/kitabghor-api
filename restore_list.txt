@@ -1,0 +1,72 @@
+;
+; Archive created at 2026-07-25 05:28:11
+;     dbname: kitabghor_db
+;     TOC Entries: 62
+;     Compression: none
+;     Dump Version: 1.16-0
+;     Format: DIRECTORY
+;     Integer: 4 bytes
+;     Offset: 8 bytes
+;     Dumped from database version: 18.4 (Debian 18.4-1.pgdg12+1)
+;     Dumped by pg_dump version: 18.4 (Debian 18.4-1.pgdg12+1)
+;
+;
+; Selected TOC Entries:
+;
+5; 2615 2200 SCHEMA - public kitabghor_db_user
+3505; 0 0 COMMENT - SCHEMA "public" kitabghor_db_user
+872; 1247 16424 TYPE public OrderStatus kitabghor_db_user
+875; 1247 16438 TYPE public PaymentStatus kitabghor_db_user
+869; 1247 16418 TYPE public ProductType kitabghor_db_user
+866; 1247 16413 TYPE public Role kitabghor_db_user
+221; 1259 16461 TABLE public Address kitabghor_db_user
+224; 1259 16505 TABLE public Bundle kitabghor_db_user
+225; 1259 16517 TABLE public BundleItem kitabghor_db_user
+222; 1259 16477 TABLE public Category kitabghor_db_user
+230; 1259 16588 TABLE public Coupon kitabghor_db_user
+226; 1259 16529 TABLE public Order kitabghor_db_user
+227; 1259 16551 TABLE public OrderItem kitabghor_db_user
+223; 1259 16487 TABLE public Product kitabghor_db_user
+228; 1259 16565 TABLE public Review kitabghor_db_user
+220; 1259 16445 TABLE public User kitabghor_db_user
+229; 1259 16578 TABLE public Wishlist kitabghor_db_user
+219; 1259 16398 TABLE public _prisma_migrations kitabghor_db_user
+3488; 0 16461 TABLE DATA public Address kitabghor_db_user
+3491; 0 16505 TABLE DATA public Bundle kitabghor_db_user
+3492; 0 16517 TABLE DATA public BundleItem kitabghor_db_user
+3489; 0 16477 TABLE DATA public Category kitabghor_db_user
+3497; 0 16588 TABLE DATA public Coupon kitabghor_db_user
+3493; 0 16529 TABLE DATA public Order kitabghor_db_user
+3494; 0 16551 TABLE DATA public OrderItem kitabghor_db_user
+3490; 0 16487 TABLE DATA public Product kitabghor_db_user
+3495; 0 16565 TABLE DATA public Review kitabghor_db_user
+3487; 0 16445 TABLE DATA public User kitabghor_db_user
+3496; 0 16578 TABLE DATA public Wishlist kitabghor_db_user
+3486; 0 16398 TABLE DATA public _prisma_migrations kitabghor_db_user
+3306; 2606 16476 CONSTRAINT public Address Address_pkey kitabghor_db_user
+3314; 2606 16528 CONSTRAINT public BundleItem BundleItem_pkey kitabghor_db_user
+3312; 2606 16516 CONSTRAINT public Bundle Bundle_pkey kitabghor_db_user
+3308; 2606 16486 CONSTRAINT public Category Category_pkey kitabghor_db_user
+3326; 2606 16602 CONSTRAINT public Coupon Coupon_pkey kitabghor_db_user
+3318; 2606 16564 CONSTRAINT public OrderItem OrderItem_pkey kitabghor_db_user
+3316; 2606 16550 CONSTRAINT public Order Order_pkey kitabghor_db_user
+3310; 2606 16504 CONSTRAINT public Product Product_pkey kitabghor_db_user
+3320; 2606 16577 CONSTRAINT public Review Review_pkey kitabghor_db_user
+3304; 2606 16460 CONSTRAINT public User User_pkey kitabghor_db_user
+3322; 2606 16587 CONSTRAINT public Wishlist Wishlist_pkey kitabghor_db_user
+3301; 2606 16411 CONSTRAINT public _prisma_migrations _prisma_migrations_pkey kitabghor_db_user
+3324; 1259 16605 INDEX public Coupon_code_key kitabghor_db_user
+3302; 1259 16603 INDEX public User_email_key kitabghor_db_user
+3323; 1259 16604 INDEX public Wishlist_userId_productId_key kitabghor_db_user
+3327; 2606 16606 FK CONSTRAINT public Address Address_userId_fkey kitabghor_db_user
+3330; 2606 16621 FK CONSTRAINT public BundleItem BundleItem_bundleId_fkey kitabghor_db_user
+3331; 2606 16626 FK CONSTRAINT public BundleItem BundleItem_productId_fkey kitabghor_db_user
+3328; 2606 16611 FK CONSTRAINT public Category Category_parentId_fkey kitabghor_db_user
+3333; 2606 16636 FK CONSTRAINT public OrderItem OrderItem_orderId_fkey kitabghor_db_user
+3334; 2606 16641 FK CONSTRAINT public OrderItem OrderItem_productId_fkey kitabghor_db_user
+3332; 2606 16631 FK CONSTRAINT public Order Order_userId_fkey kitabghor_db_user
+3329; 2606 16616 FK CONSTRAINT public Product Product_categoryId_fkey kitabghor_db_user
+3335; 2606 16651 FK CONSTRAINT public Review Review_productId_fkey kitabghor_db_user
+3336; 2606 16646 FK CONSTRAINT public Review Review_userId_fkey kitabghor_db_user
+3337; 2606 16661 FK CONSTRAINT public Wishlist Wishlist_productId_fkey kitabghor_db_user
+3338; 2606 16656 FK CONSTRAINT public Wishlist Wishlist_userId_fkey kitabghor_db_user
