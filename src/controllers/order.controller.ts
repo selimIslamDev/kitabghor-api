@@ -14,7 +14,7 @@ const createOrderSchema = z.object({
     district: z.string(),
     postalCode: z.string().optional(),
   }),
-  paymentMethod: z.enum(["sslcommerz", "bkash", "nagad"]),
+  paymentMethod: z.enum(["sslcommerz", "cod"]),
   couponCode: z.string().optional(),
 });
 
@@ -69,6 +69,10 @@ export const createOrder = async (req: AuthRequest, res: Response): Promise<any>
 
       const finalAmount = totalAmount - discountAmount;
 
+      // COD orders are considered "confirmed" immediately since there's no
+      // payment gateway step. isPaid stays false until the delivery agent
+      // collects cash and admin marks it paid manually.
+      // sslcommerz orders stay isPaid:false until the IPN/success callback confirms payment.
       const createdOrder = await tx.order.create({
         data: {
           userId: req.userId!,
@@ -76,6 +80,7 @@ export const createOrder = async (req: AuthRequest, res: Response): Promise<any>
           discountAmount,
           finalAmount,
           paymentMethod,
+          isPaid: false,
           shippingAddress,
           couponCode,
           items: { create: orderItems },
@@ -166,9 +171,6 @@ export const getMyOrders = async (req: AuthRequest, res: Response): Promise<any>
     return res.status(500).json({ success: false, message: "Server error" });
   }
 };
-
-
-
 
 
 
