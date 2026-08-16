@@ -56,8 +56,8 @@ export const createOrder = async (req: AuthRequest, res: Response): Promise<any>
 
       let discountAmount = 0;
       if (couponCode) {
-        const coupon = await tx.coupon.findUnique({ where: { code: couponCode, isActive: true } });
-        if (coupon) {
+        const coupon = await tx.coupon.findUnique({ where: { code: couponCode } });
+        if (coupon && coupon.isActive) {
           if (!coupon.minOrderAmount || totalAmount >= coupon.minOrderAmount) {
             discountAmount = coupon.discountType === "percent"
               ? (totalAmount * coupon.discountValue) / 100
@@ -69,10 +69,11 @@ export const createOrder = async (req: AuthRequest, res: Response): Promise<any>
 
       const finalAmount = totalAmount - discountAmount;
 
-      // COD orders are considered "confirmed" immediately since there's no
-      // payment gateway step. isPaid stays false until the delivery agent
-      // collects cash and admin marks it paid manually.
-      // sslcommerz orders stay isPaid:false until the IPN/success callback confirms payment.
+      // COD orders are confirmed immediately since there's no payment gateway
+      // step — paymentStatus stays UNPAID until the delivery agent collects
+      // cash and admin marks it paid manually.
+      // sslcommerz orders stay status:PENDING / paymentStatus:UNPAID until the
+      // IPN/success callback confirms payment (then flipped to CONFIRMED/PAID).
       const createdOrder = await tx.order.create({
         data: {
           userId: req.userId!,
@@ -80,7 +81,8 @@ export const createOrder = async (req: AuthRequest, res: Response): Promise<any>
           discountAmount,
           finalAmount,
           paymentMethod,
-          isPaid: false,
+          status: paymentMethod === "cod" ? "CONFIRMED" : "PENDING",
+          paymentStatus: "UNPAID",
           shippingAddress,
           couponCode,
           items: { create: orderItems },
@@ -171,8 +173,6 @@ export const getMyOrders = async (req: AuthRequest, res: Response): Promise<any>
     return res.status(500).json({ success: false, message: "Server error" });
   }
 };
-
-
 
 
 
