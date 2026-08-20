@@ -13,8 +13,48 @@ const PORT = process.env.PORT || 5000;
 // Init Socket.io
 initSocket(httpServer);
 
-// Middleware
-app.use(cors({ origin: process.env.FRONTEND_URL || "http://localhost:3000", credentials: true }));
+// ---------- CORS CONFIG ----------
+// Normalize helper: remove trailing slash so "https://x.com/" and "https://x.com" both match
+const normalize = (url: string) => url.trim().replace(/\/+$/, "");
+
+// Support multiple origins via comma-separated FRONTEND_URL env var
+// e.g. FRONTEND_URL=https://kitabghor-web.vercel.app,https://kitabghor.com
+const envOrigins = (process.env.FRONTEND_URL || "")
+  .split(",")
+  .map((o) => o.trim())
+  .filter(Boolean)
+  .map(normalize);
+
+const allowedOrigins = [
+  ...envOrigins,
+  "http://localhost:3000", // local dev
+  "https://kitabghor-web.vercel.app", // hardcoded safety net for production
+];
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Allow requests with no origin (curl, Postman, server-to-server, mobile apps)
+      if (!origin) return callback(null, true);
+
+      const normalizedOrigin = normalize(origin);
+
+      if (allowedOrigins.includes(normalizedOrigin)) {
+        return callback(null, true);
+      }
+
+      // Allow any *.vercel.app preview deployment (optional, useful during dev)
+      if (/^https:\/\/kitabghor-web-[a-z0-9-]+\.vercel\.app$/.test(normalizedOrigin)) {
+        return callback(null, true);
+      }
+
+      console.warn(`❌ CORS blocked request from origin: ${origin}`);
+      return callback(new Error(`Not allowed by CORS: ${origin}`));
+    },
+    credentials: true,
+  })
+);
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
